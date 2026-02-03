@@ -1,6 +1,5 @@
-# PostgreSQL HA – My Notes (Sina)
-
-## Context / What I have
+# My Notes
+## What I have
 - I have **3 virtual machines**
   - ubuntu24.04-1
   - ubuntu24.04-2
@@ -9,8 +8,8 @@
   - Can SSH to each other
   - Can reach each other over the network
   - Have **Docker + Docker Compose**
-- I **cannot add another VM**
-- I want **PostgreSQL High Availability (HA)**, not just replication
+
+- I want **PostgreSQL High Availability (HA)**
 
 ---
 
@@ -29,25 +28,27 @@
 
 ## Important clarification
 ### Replication ≠ HA
-- Simple Docker Compose examples (primary + replica):
-  - ❌ No automatic failover
-  - ❌ Manual promotion
-  - ❌ Not production HA
+- Simple Docker Compose (primary + replica):
+  - No automatic failover
+  - Manual promotion
+  - Not production HA
+
 - **HA requires a “brain”** that decides:
   - Who is primary
   - When to promote a standby
 
 ---
 
-## What pg_auto_failover actually is
+## What is pg_auto_failover ?
 - An **official PostgreSQL HA solution**
 - Provides:
   - Single-primary PostgreSQL
   - Automatic failover
-  - Physical streaming replication
+
 - It is:
   - A PostgreSQL extension
   - A control process (`pg_autoctl`)
+
 - It is **not**:
   - Multi-master
   - Write-to-all-nodes
@@ -108,11 +109,11 @@ Why:
   - **STANDBY**
 
 ### VM3
-- `pg_monitor`
-  - PostgreSQL monitor database
 - `pg_node3`
   - PostgreSQL + pg_auto_failover
   - **STANDBY**
+- `pg_monitor`
+  - PostgreSQL monitor database
 
 ---
 
@@ -158,11 +159,4 @@ docker exec -it <container> pg_autoctl ...
 - Monitor on VM3
 - Configure via `pg_autoctl`
 
----
 
-## Mental checkpoint
-Before:
-> I want 3 Postgres nodes HA
-
-Now:
-> I want one writable Postgres protected by automatic failover.
