@@ -11,14 +11,13 @@
 
 - I want **PostgreSQL High Availability (HA)**
 
----
 
 ## Initial confusion I had
 - I thought:
   - Maybe PostgreSQL can be “HA” just by running multiple containers
   - Maybe data can be written to all nodes
   - Maybe Docker Compose examples on GitHub are enough
-- I also wasn’t sure:
+- wasn’t sure that:
   - What pg_auto_failover actually is
   - Whether it’s a container, a binary, or something else
   - How nodes discover each other
