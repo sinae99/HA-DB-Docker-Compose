@@ -18,7 +18,7 @@ services:
       - "5432:5432"
 
     volumes:
-      - node1_pgdata:/var/lib/postgres/pgaf
+      - node1_pgdata:/var/lib/postgres
 
 
 
