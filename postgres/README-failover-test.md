@@ -97,25 +97,98 @@ Expected:
 
 ---
 
-## Rejoin the old primary as a standby
+# Rejoining 
 
-Because the old primary may have diverged, the simplest clean rejoin is to wipe its node volume and re-add it.
+### Step 1 — Identify stale node metadata (Monitor)
 
-### On the old primary VM (example: VM1)
+On **VM3**:
+
+```bash
+cd /home/s/db/monitor
+docker compose exec -u postgres pg-monitor psql -d pg_auto_failover -c "
+select nodeid, nodename, nodehost, nodeport, reportedstate, goalstate
+from pgautofailover.node
+order by nodeid;
+"
+```
+
+Example stale entry:
+
+```
+nodeid | nodehost           | nodeport | goalstate
+------+--------------------+----------+-----------
+1      | 192.168.122.18    | 5432     | demoted
+```
+
+---
+
+### Step 2 — Delete the old node from the monitor
+
+On **VM3**:
+
+```bash
+docker compose exec -u postgres pg-monitor psql -d pg_auto_failover -c "
+delete from pgautofailover.node
+where nodehost = '192.168.122.18'
+  and nodeport = 5432;
+"
+```
+
+Confirm removal:
+
+```bash
+docker compose exec -u postgres pg-monitor \
+  pg_autoctl show state --pgdata /var/lib/postgres/pgaf
+```
+
+The node must no longer appear.
+
+---
+
+### Step 3 — Recreate the node container
+
+On the **former primary VM**:
+
 ```bash
 cd /home/s/db/node
 docker compose down
 docker volume rm node_node1_pgdata 2>/dev/null || true
 docker compose up -d
+```
+
+Follow logs:
+
+```bash
 docker logs -f --tail=200 pg-node1
 ```
 
-### Verify final state (VM3 monitor)
+Expected log sequence:
+
+- Node registered with the monitor
+- State: `wait_standby`
+- `pg_basebackup` from current primary
+- `catchingup → secondary`
+
+---
+
+### Step 4 — Verify final cluster state
+
+On **VM3**:
+
 ```bash
 cd /home/s/db/monitor
-docker compose exec -u postgres pg-monitor pg_autoctl show state --pgdata /var/lib/postgres/pgaf
+docker compose exec -u postgres pg-monitor \
+  pg_autoctl show state --pgdata /var/lib/postgres/pgaf
 ```
 
 Expected end state:
+
 - 1 primary
 - 2 secondaries
+- Correct ports:
+  - VM1 → 5432
+  - VM2 → 5432
+  - VM3 → 5433
+
+---
+
