@@ -1,140 +1,113 @@
 # PostgreSQL + pg_auto_failover + 3 VM + Docker Compose
 
-High-availability PostgreSQL using **pg_auto_failover** across **3 Ubuntu VMs**, running on **Docker Compose**.
-No Kubernetes
-
----
+High-availability PostgreSQL using **pg_auto_failover** across **3 Ubuntu VMs** with **Docker Compose**.  
+(No Kubernetes world!)
 
 ## Architecture
 
-- **VM1 (192.168.122.18)**
-  PostgreSQL node (`pg-node1`) — primary or standby
+| VM | IP | Role |
+|---|---|---|
+| VM1 | 192.168.122.18 | Postgres node (`pg-node1`) |
+| VM2 | 192.168.122.233 | Postgres node (`pg-node2`) |
+| VM3 | 192.168.122.246 | **Monitor** (`pg-monitor`) on **5432** + Postgres node (`pg-node3`) on host **5433** |
 
-- **VM2 (192.168.122.233)**
-  PostgreSQL node (`pg-node2`) — primary or standby
+- Exactly **one primary** (read-write), others **standby** (read-only)
+- Failover is automatic via **pg_auto_failover monitor**
 
-- **VM3 (192.168.122.246)**
-  - pg_auto_failover **Monitor** (`pg-monitor`) on port **5432**
-  - PostgreSQL node (`pg-node3`) exposed on host port **5433**
+## Repo / VM Layout
 
-Exactly **one primary**, others are **standbys**.
-Failover is **automatic**.
+This repo contains reference configs, but on the VMs we run from:
 
----
+- VM3 monitor: `/home/s/db/monitor/docker-compose.yml`
+- VM1 node: `/home/s/db/node/docker-compose.yml`
+- VM2 node: `/home/s/db/node/docker-compose.yml`
+- VM3 node: `/home/s/db/node3/docker-compose.yml`
 
-## Repository Structure
+> Make sure the compose files are copied to those exact paths before starting.
 
-```
-postgres/
-├── README.md
-├── env/
-├── configs/
-├── scripts/
-└── docs/
-```
 
----
+## 1) Start Monitor (VM3)
 
-## Bring-up Order
-
-### 0) Copy docker-compose files
-Copy the correct compose file to each VM:
-
-| VM | Source | Destination |
-|----|-------|-------------|
-| VM3 (monitor) | `configs/monitor/docker-compose.yml` | `/home/s/db/monitor/docker-compose.yml` |
-| VM1 (node) | `configs/node-vm1/docker-compose.yml` | `/home/s/db/node/docker-compose.yml` |
-| VM2 (node) | `configs/node-vm2/docker-compose.yml` | `/home/s/db/node/docker-compose.yml` |
-| VM3 (node) | `configs/node-vm3/docker-compose.yml` | `/home/s/db/node3/docker-compose.yml` |
-
----
-
-### 1) Start monitor (VM3)
 ```bash
-bash scripts/10-monitor-vm3.sh
+cd /home/s/db/monitor
+docker compose up -d
+docker logs -f --tail=200 pg-monitor
 ```
 
-### 2) Start VM1 node
+Confirm:
 ```bash
-bash scripts/20-node-vm1.sh
+docker compose exec -u postgres pg-monitor psql -d pg_auto_failover -c "select 1;"
 ```
 
-### 3) Start VM2 node
+## 2) Fix Monitor pg_hba.conf (REQUIRED)
+
 ```bash
-bash scripts/30-node-vm2.sh
+docker exec -u postgres -it pg-monitor bash -lc '
+cat >> /var/lib/postgres/pgaf/pg_hba.conf <<EOF
+
+host  pg_auto_failover  autoctl_node  192.168.122.18/32   trust
+host  pg_auto_failover  autoctl_node  192.168.122.233/32  trust
+host  pg_auto_failover  autoctl_node  192.168.122.246/32  trust
+EOF
+tail -n 20 /var/lib/postgres/pgaf/pg_hba.conf
+'
 ```
 
-### 4) Start VM3 node
+Reload:
 ```bash
-bash scripts/40-node-vm3.sh
+docker compose exec -u postgres pg-monitor psql -d pg_auto_failover -c "select pg_reload_conf();"
 ```
 
----
+## 3) Start VM1 Node (initial primary)
 
-## Verify Cluster
-Run on **VM3**:
 ```bash
-bash scripts/50-verify.sh
+cd /home/s/db/node
+docker compose up -d
+docker logs -f --tail=200 pg-node1
 ```
 
-Or directly:
+Verify:
 ```bash
 cd /home/s/db/monitor
 docker compose exec -u postgres pg-monitor pg_autoctl show state --pgdata /var/lib/postgres/pgaf
 ```
 
-Expected:
-- 1 primary
-- 2 secondaries
+## 4) Start VM2 Node (standby)
 
----
-
-## Failover Test
-Stop the current primary container on its VM:
 ```bash
-bash scripts/60-failover-test.sh vm1
+cd /home/s/db/node
+docker compose up -d
+docker logs -f --tail=300 pg-node2
 ```
 
-Watch promotion from the monitor:
+Verify again from monitor.
+
+## 5) Start VM3 Node (standby on 5433)
+
+```bash
+cd /home/s/db/node3
+docker compose up -d
+docker logs -f --tail=300 pg-node3
+```
+
+Confirm ports:
+```bash
+docker ps --format "table {{.Names}}\t{{.Ports}}"
+```
+
+Final verify:
 ```bash
 cd /home/s/db/monitor
 docker compose exec -u postgres pg-monitor pg_autoctl show state --pgdata /var/lib/postgres/pgaf
 ```
-
----
-
-## Rejoin Old Primary
-On the old primary VM:
-```bash
-bash scripts/70-rejoin-old-primary.sh pg-node1 soft
-```
-
-If needed (destructive, guaranteed):
-```bash
-bash scripts/70-rejoin-old-primary.sh pg-node1 clean
-```
-
----
 
 ## Application Connectivity
 
-**No proxy, no VIP.**
-Use a **multi-host libpq DSN** with `target_session_attrs=read-write`.
+Use a multi-host DSN with `target_session_attrs=read-write`:
 
-
-Example DSN for app that want to connect to postgres :
 ```
 host=192.168.122.18,192.168.122.233
 port=5432
 sslmode=disable
 target_session_attrs=read-write
 ```
-
----
-
-## Reset Everything
-On any VM:
-```bash
-bash scripts/99-clean-reset.sh
-```
-
