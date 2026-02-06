@@ -16,7 +16,7 @@ services:
 
     # IMPORTANT: monitor already uses host port 5432 on VM3, so node uses 5433 on the host
     ports:
-      - "5433:5432"
+      - "5433:5433"
 
     volumes:
       - node3_pgdata:/var/lib/postgres
@@ -35,7 +35,7 @@ services:
           su - postgres -c "
             pg_autoctl create postgres \
               --pgdata /var/lib/postgres/pgaf \
-              --pgport 5432 \
+              --pgport 5433 \
               --hostname 192.168.122.246 \
               --monitor postgres://autoctl_node@192.168.122.246:5432/pg_auto_failover?sslmode=disable \
               --auth trust \
