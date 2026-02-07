@@ -9,10 +9,13 @@ High-availability PostgreSQL using **pg_auto_failover** across **3 Ubuntu VMs** 
 |---|---|---|
 | VM1 | 192.168.122.18 | Postgres node (`pg-node1`) |
 | VM2 | 192.168.122.233 | Postgres node (`pg-node2`) |
-| VM3 | 192.168.122.246 | **Monitor** (`pg-monitor`) on **5432** + Postgres node (`pg-node3`) on host **5433** |
+| VM3 | 192.168.122.246 | **Monitor** (`pg-monitor`) on **5500** + Postgres node (`pg-node3`) on host **5432** |
 
 - Exactly **one primary** (read-write), others **standby** (read-only)
 - Failover is automatic via **pg_auto_failover monitor**
+- Note: The pg_auto_failover monitor runs PostgreSQL on port 5432 inside the container,
+but is exposed on host port 5500 to avoid conflict with pg-node3.
+
 
 ## Repo / VM Layout
 
@@ -82,7 +85,7 @@ docker logs -f --tail=300 pg-node2
 
 Verify again from monitor.
 
-## 5) Start VM3 Node (standby on 5433)
+## 5) Start VM3 Node (standby)
 
 ```bash
 cd /home/s/db/node3
@@ -106,7 +109,7 @@ docker compose exec -u postgres pg-monitor pg_autoctl show state --pgdata /var/l
 Use a multi-host DSN with `target_session_attrs=read-write`:
 
 ```
-host=192.168.122.18,192.168.122.233
+host=192.168.122.18,192.168.122.233,192.168.122.246
 port=5432
 sslmode=disable
 target_session_attrs=read-write

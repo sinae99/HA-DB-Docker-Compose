@@ -5,12 +5,11 @@
 
 | VM | IP | Container |
 |---|---|---|
-| VM1 | 192.168.122.18 | `pg-node1` |
-| VM2 | 192.168.122.233 | `pg-node2` |
-| VM3 | 192.168.122.246 | `pg-monitor` (monitor) + `pg-node3` (node) |
+| VM1 | ip = 192.168.122.18 | `pg-node1` |
+| VM2 | ip = 192.168.122.233 | `pg-node2` |
+| VM3 | ip = 192.168.122.246 | `pg-monitor` (monitor) + `pg-node3` (node) |
 
-- Monitor: VM3 `pg-monitor` on host port **5432**
-- VM3 node: `pg-node3` on host port **5433**
+- Monitor: VM3 `pg-monitor` on host port **5500**
 - Nodes use Postgres internal port **5432**.
 
 ---
@@ -18,6 +17,9 @@
 ## Goal
 
 Prove that when the **current primary** goes down, **pg_auto_failover promotes a standby** to primary automatically.
+
+psql "postgres://autoctl_node@192.168.122.246:5500/pg_auto_failover?sslmode=disable" -c "select 1;"
+
 
 ---
 
@@ -188,7 +190,13 @@ Expected end state:
 - Correct ports:
   - VM1 → 5432
   - VM2 → 5432
-  - VM3 → 5433
+  - VM3 → 5432
+
+
+
+Note: The monitor’s PostgreSQL runs on port 5432 inside the container, but is exposed on host port 5500.
+Nodes connect to the monitor using 192.168.122.246:5500.
+
 
 ---
 
