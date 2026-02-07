@@ -12,7 +12,7 @@ services:
       PGSSLMODE: disable
 
     ports:
-      - "5432:5432"
+      - "5500:5432"
 
     volumes:
       - monitor_pgdata:/var/lib/postgres/pgaf

@@ -37,7 +37,7 @@ services:
               --pgdata /var/lib/postgres/pgaf \
               --pgport 5432 \
               --hostname 192.168.122.233 \
-              --monitor postgres://autoctl_node@192.168.122.246:5432/pg_auto_failover?sslmode=disable \
+              --monitor postgres://autoctl_node@192.168.122.246:5500/pg_auto_failover?sslmode=disable \
               --auth trust \
               --no-ssl
           "
