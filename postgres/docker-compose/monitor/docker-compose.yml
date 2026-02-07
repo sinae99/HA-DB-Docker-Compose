@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   pg-monitor:
     image: citusdata/pg_auto_failover:latest
@@ -37,15 +35,10 @@ services:
           "
         fi
 
-        # Allow failover even if only one node is alive (no sync-standby quorum requirement)
-        su - postgres -c "
-          pg_autoctl set formation number-sync-standbys 0 \
-            --pgdata /var/lib/postgres/pgaf
-        " || true
-
         exec su - postgres -c "pg_autoctl run --pgdata /var/lib/postgres/pgaf"
       '
 
 volumes:
   monitor_pgdata:
+
 
