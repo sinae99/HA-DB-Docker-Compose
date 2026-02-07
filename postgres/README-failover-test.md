@@ -123,8 +123,9 @@ nodeid | nodehost           | nodeport | goalstate
 ```
 
 ---
+### ( if "pgdata" is gone and there is need to a new registration )
 
-### Step 2 — Delete the old node from the monitor
+## Step 2 — Delete the old node from the monitor
 
 On **VM3**:
 
