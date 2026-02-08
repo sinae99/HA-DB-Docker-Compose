@@ -4,15 +4,14 @@
 
 ## Topology
 
-  VM       IP                Role
-  -------- ----------------- -------------------------------
-  VM1      192.168.122.18    Postgres node (`pg-node1`)
-  VM2      192.168.122.233   Postgres node (`pg-node2`)
-  VM3      192.168.122.246   Primary Postgres (`pg-node3`)
-  API VM   192.168.122.16    Application host
+  VM1 ---> 192.168.122.18    Postgres node (`pg-node1`)
 
--   Exactly **one primary**, others **standby**
--   Automatic failover via **pg_auto_failover**
+  VM2 ---> 192.168.122.233   Postgres node (`pg-node2`)
+
+  VM3 ---> 192.168.122.246   Primary Postgres (`pg-node3`)
+
+  API VM ---> 192.168.122.16    Application host
+
 
 ------------------------------------------------------------------------
 
