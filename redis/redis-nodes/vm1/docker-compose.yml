@@ -1,0 +1,13 @@
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis1
+    network_mode: host
+    command: >
+      redis-server
+      --bind 0.0.0.0
+      --port 6379
+      --protected-mode no
+      --appendonly no
+      --save ""
+
