@@ -1,12 +1,5 @@
-# Redis HA -- Deployment Stages Guide
+# Redis HA -- Deployment Stages
 
-This document describes **how to deploy** the Redis + Sentinel
-high-availability setup using the repository structure below.
-
-This file is intended to be used as a **practical, repeatable deployment
-manual**.
-
-------------------------------------------------------------------------
 
 ## Repository Structure Reference
 
@@ -38,12 +31,9 @@ Deployment is intentionally split into **two stages**:
 1.  **Redis Bootstrap (data plane)**
 2.  **Sentinel Enablement (control plane)**
 
-This separation avoids instability and ensures Redis replication is
-healthy *before* enabling automatic failover.
-
 ------------------------------------------------------------------------
 
-## Stage 1 --- Redis Bootstrap (NO Sentinel)
+## Stage 1 --- Redis
 
 ### Goal
 
@@ -258,31 +248,3 @@ docker exec -it redis1 redis-cli ROLE
 Expected:
 
     slave
-
-------------------------------------------------------------------------
-
-## Client Connection Rule (IMPORTANT)
-
-Applications must connect using **Sentinel**, not a fixed Redis IP.
-
-Sentinel endpoints: - VM1:26379 - VM2:26379 - VM3:26379
-
-Master name:
-
-    mymaster
-
-------------------------------------------------------------------------
-
-## Final Notes
-
--   Sentinel manages **failover**, not replication creation
--   Redis must be stable *before* Sentinel is started
--   This deployment was tested end-to-end, including failover
--   Suitable for private networks and cache workloads
-
-------------------------------------------------------------------------
-
-**Status:**\
-✅ Redis replication established\
-✅ Sentinel quorum active\
-✅ Failover tested and verified

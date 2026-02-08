@@ -1,14 +1,7 @@
-# Redis HA on 3 VMs with Docker Compose (Redis + Sentinel, no auth, no persistence)
-
-This guide documents how to build a **high-availability Redis setup**
-across **three virtual machines**, using **Redis replication + Redis
-Sentinel**, exactly as implemented in this lab.
-
-This README is written as a **step-by-step manual** for future reuse.
+# Redis HA on 3 VMs with Docker Compose (Redis + Sentinel)
 
 ------------------------------------------------------------------------
 
-## Architecture Overview
 
 -   **3 Redis servers** (one per VM)
     -   1 master
@@ -17,22 +10,14 @@ This README is written as a **step-by-step manual** for future reuse.
     -   quorum = 2
     -   automatic failover and reconfiguration
 
-### Design choices
-
--   No authentication
--   No persistence (no AOF, no RDB)
--   Host networking (simplest cross-VM connectivity)
--   Private network only
-
 ------------------------------------------------------------------------
 
 ## VM Inventory
 
-  VM    IP                Role
-  ----- ----------------- ------------------
-  VM1   192.168.122.18    Redis + Sentinel
-  VM2   192.168.122.233   Redis + Sentinel
-  VM3   192.168.122.246   Redis + Sentinel
+
+  VM1 ----> 192.168.122.18 ---->     Redis + Sentinel
+  VM2 ----> 192.168.122.233 ---->    Redis + Sentinel
+  VM3 ----> 192.168.122.246 ---->    Redis + Sentinel
 
 ### Ports
 
@@ -245,28 +230,6 @@ Expected:
 
 ------------------------------------------------------------------------
 
-## Client Connection (IMPORTANT)
-
-Applications must connect via **Sentinel**, not a fixed Redis IP.
-
-### Sentinel endpoints
-
--   192.168.122.18:26379
--   192.168.122.233:26379
--   192.168.122.246:26379
-
-### Master name
-
-    mymaster
-
-Example:
-
-``` bash
-redis-cli -h 192.168.122.18 -p 26379 SENTINEL get-master-addr-by-name mymaster
-```
-
-------------------------------------------------------------------------
-
 ## Why Sentinel is Started LAST
 
 Sentinel does **not** create Redis replication.
@@ -281,15 +244,3 @@ Correct order:
 
 Sentinel is **control plane**, Redis is **data plane**.
 
-------------------------------------------------------------------------
-
-## Final Notes
-
--   This setup is safe for **private networks only**
--   Do NOT expose Redis or Sentinel ports publicly
--   No persistence means restarts lose in-memory data
--   Sentinel automatically restores topology after failures
-
-------------------------------------------------------------------------
-
-**Status:** ✅ Fully tested and verified
