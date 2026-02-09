@@ -7,13 +7,13 @@
   
   VM              IP                Services
   --------------- ----------------- ---------------------------------------
-  VM1 ----> 192.168.122.18    Postgres, Redis + Sentinel, MongoDB
+  VM1 ----> 192.168.122.18 ----> Postgres, Redis + Sentinel, MongoDB
 
-  VM2 ----> 192.168.122.233   Postgres, Redis + Sentinel, MongoDB
+  VM2 ----> 192.168.122.233 ----> Postgres, Redis + Sentinel, MongoDB
 
-  VM3 ----> 192.168.122.246   Postgres + pg_auto_failover monitor, Redis + Sentinel, MongoDB
+  VM3 ----> 192.168.122.246 ----> Postgres + pg_auto_failover monitor, Redis + Sentinel, MongoDB
 
-  API VM ----> 192.168.122.16    API client
+  API VM ----> 192.168.122.16 ----> API client
 
 
 
@@ -37,17 +37,10 @@
 **Technology:** pg_auto_failover\
 **Pattern:** One primary, multiple standbys, automatic failover
 
-Docs:
 
-`postgres/README.md` ---> architecture and
-deployment
-`postgres/README-failover-test.md` ---> failover and rejoin
-procedures
+`postgres/README.md` ---> architecture and deployment
 
-
-Start here: `postgres/README.md`
-
-
+`postgres/README-failover-test.md` ---> failover and rejoin procedures
 
 
 
@@ -56,13 +49,12 @@ Start here: `postgres/README.md`
 **Technology:** Redis Replication + Sentinel\
 **Pattern:** 1 master, 2 replicas, Sentinel quorum = 2
 
-Docs:
+
+
 
 `redis/README.md` ---> end-to-end Redis HA setup
+
 `redis/README-deploy-stages.md` ---> staged deployment philosophy
-
-
-Start here: `redis/README.md`
 
 
 
@@ -71,18 +63,17 @@ Start here: `redis/README.md`
 **Technology:** MongoDB Replica Set\
 **Pattern:** Automatic primary election
 
-Docs:
 
 `mongo/README-mongodb-replicaset.md`
 
 
 
 
-## API --- Client Connectivity
+## goapi --- Client Connectivity
 
 The API consumes **all three HA systems simultaneously**.
 
-Docs:
+
 
 `api/README-api-connectivity.md`
 
