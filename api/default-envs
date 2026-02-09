@@ -1,68 +1,37 @@
-########################################
+##############################################
 # General
-########################################
-
 DEV_MODE=0
 EN_CACHE=1
 SIDECAR_MODE=0
 REST_ADDR=:80
 GORM_LOGGER_LEVEL=WARN
 
-########################################
-# PostgreSQL (HA via pg_auto_failover)
-# Use libpq multi-host URI
-########################################
-
-POSTGRES_URI=postgres://postgres@192.168.122.18,192.168.122.233,192.168.122.246:5432/appdb_utf8?sslmode=disable&target_session_attrs=read-write&options=-c%20client_encoding%3DUTF8
+##############################################
+# Postgres
+POSTGRES_APP_NAME=api
+POSTGRES_HOST=192.168.122.246
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=
+POSTGRES_DB=appdb_utf8
+POSTGRES_DATABASE=appdb_utf8
 POSTGRES_SSLMODE=disable
 
-# (kept for compatibility / logging only)
-POSTGRES_APP_NAME=api
-POSTGRES_DB=appdb_utf8
+POSTGRES_URI=postgres://postgres@192.168.122.18,192.168.122.233,192.168.122.246:5432/appdb_utf8?sslmode=disable&target_session_attrs=read-write
 
-########################################
+PGOPTIONS=-c client_encoding=UTF8
+PGCLIENTENCODING=UTF8
+
+##############################################
 # Redis (Sentinel)
-########################################
-
 REDIS_SENTINEL=1
 REDIS_MASTER_NAME=mymaster
 REDIS_ADDRS=192.168.122.18:26379,192.168.122.233:26379,192.168.122.246:26379
 REDIS_PASSWORD=
 REDIS_SSL_ENABLED=0
 
-########################################
-# MongoDB (required by app)
-########################################
-
-MONGO_URL=mongodb://goapi-mongodb:27017
+##############################################
+# Mongo (required by app startup)
+#MONGO_URL=mongodb://goapi-mongodb:27017
+MONGO_URL=mongodb://192.168.122.18:27017,192.168.122.233:27017,192.168.122.246:27017/?replicaSet=rs0
 MONGO_DB=arcaptcha
-
-########################################
-# JWT / Auth (required but values depend on env)
-########################################
-
-JWT_SECRET=change-me
-JWT_SECRET_RESET_PASSWORD=change-me-too
-
-########################################
-# Metrics (safe defaults)
-########################################
-
-MONITOR_PORT=2112
-MONITOR_URL=/metrics
-
-########################################
-# Disabled / Dummy services
-# (prevent startup crashes or noisy logs)
-########################################
-
-MAIL_HOST=127.0.0.1
-MAIL_PORT=1
-MAIL_USER=dummy
-MAIL_PASS=dummy
-
-IMAGE_ADDR=http://127.0.0.1:1
-RBAC_ADDR=http://127.0.0.1:1
-SAMURAI_ADDR=http://127.0.0.1:1
-SIDECAR_ADDR=http://127.0.0.1:1
-
