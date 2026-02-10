@@ -1,9 +1,15 @@
 ---
+
+##################################### monitor
+
 - name: Deploy Postgres monitor
   hosts: pg_monitor
   gather_facts: false
   roles:
     - pg_monitor
+
+
+    ##################################### PS-nodes
 
 - name: Deploy Postgres node1 (initial primary)
   hosts: pg_node_vm1
@@ -51,8 +57,7 @@
         chdir: "{{ pg_monitor_dir }}"
 
 
-
-
+##################################### redis
 
 - name: Deploy Redis master + replicas, then Sentinel (combined compose, staged start)
   hosts: redis_vms
@@ -66,3 +71,22 @@
   tasks:
     - name: Show sentinels known to sentinel1
       command: docker exec -t sentinel1 redis-cli -p 26379 SENTINEL sentinels mymaster
+
+
+
+
+##################################### mongo1
+
+
+- name: Deploy MongoDB on all members and initialize replica set
+  hosts: mongo_members
+  gather_facts: false
+  roles:
+    - mongo
+
+- name: Verify Mongo replica set members (from VM1)
+  hosts: mongo_vm1
+  gather_facts: false
+  tasks:
+    - name: Show rs members
+      command: docker exec -t mongo1 mongosh --quiet --eval 'rs.status().members.map(m => ({name:m.name, state:m.stateStr}))'
