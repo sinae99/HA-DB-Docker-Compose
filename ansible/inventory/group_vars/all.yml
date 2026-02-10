@@ -30,3 +30,4 @@ api_dir: "/home/s/goapi"
 # ---------- Monitor connection string used by nodes ----------
 # Monitor runs on VM3, exposed on host port 5500
 pg_monitor_dsn: "postgres://autoctl_node@192.168.122.246:5500/pg_auto_failover?sslmode=disable"
+

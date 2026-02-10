@@ -167,3 +167,15 @@
   gather_facts: false
   roles:
     - api
+
+
+
+
+
+
+
+- name: Final HA status report
+  hosts: all
+  gather_facts: false
+  roles:
+    - report
