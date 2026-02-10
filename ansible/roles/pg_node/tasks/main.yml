@@ -1,0 +1,25 @@
+---
+- name: Decide Postgres node directory for this host
+  set_fact:
+    pg_node_dir: >-
+      {% if inventory_hostname == 'vm1' %}{{ pg_node_vm1_dir }}
+      {% elif inventory_hostname == 'vm2' %}{{ pg_node_vm2_dir }}
+      {% elif inventory_hostname == 'vm3' %}{{ pg_node_vm3_dir }}
+      {% else %}/home/s/db/node{% endif %}
+
+- name: Ensure Postgres node directory exists
+  file:
+    path: "{{ pg_node_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Copy node docker-compose.yml for this host
+  copy:
+    src: "vm{{ '1' if inventory_hostname == 'vm1' else '2' if inventory_hostname == 'vm2' else '3' }}/docker-compose.yml"
+    dest: "{{ pg_node_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Start Postgres node (docker compose up -d)
+  command: docker compose up -d
+  args:
+    chdir: "{{ pg_node_dir }}"

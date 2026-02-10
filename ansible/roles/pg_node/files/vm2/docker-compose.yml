@@ -1,0 +1,52 @@
+services:
+  pg-node:
+    image: citusdata/pg_auto_failover:latest
+    container_name: pg-node2
+    hostname: pg-node2
+    extra_hosts:
+      - "pg-node2:192.168.122.233"
+    restart: unless-stopped
+
+    # run as root to ensure the volume can be chowned; pg_autoctl runs as postgres via su
+    user: "0:0"
+
+    environment:
+      PGDATA: /var/lib/postgres/pgaf
+      PGSSLMODE: disable
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - node2_pgdata:/var/lib/postgres
+
+    command: >
+      bash -lc '
+        set -euo pipefail
+
+        # Ensure PGDATA and backup dirs exist and are writable by postgres
+        mkdir -p /var/lib/postgres/pgaf
+        mkdir -p /var/lib/postgres/backup
+        chown -R postgres:postgres /var/lib/postgres
+        chmod 700 /var/lib/postgres/pgaf
+        chmod 700 /var/lib/postgres/backup
+
+        if [ ! -s /var/lib/postgres/pgaf/PG_VERSION ]; then
+          su - postgres -c "
+            pg_autoctl create postgres \
+              --pgdata /var/lib/postgres/pgaf \
+              --pgport 5432 \
+              --hostname 192.168.122.233 \
+              --monitor postgres://autoctl_node@192.168.122.246:5500/pg_auto_failover?sslmode=disable \
+              --auth trust \
+              --no-ssl
+          "
+        fi
+
+        exec su - postgres -c "pg_autoctl run --pgdata /var/lib/postgres/pgaf"
+      '
+
+volumes:
+  node2_pgdata:
+
+

@@ -1,0 +1,68 @@
+---
+- name: Deploy Postgres monitor
+  hosts: pg_monitor
+  gather_facts: false
+  roles:
+    - pg_monitor
+
+- name: Deploy Postgres node1 (initial primary)
+  hosts: pg_node_vm1
+  gather_facts: false
+  roles:
+    - pg_node
+
+- name: Verify Postgres state after node1 join
+  hosts: pg_monitor
+  gather_facts: false
+  tasks:
+    - name: Show pg_auto_failover state
+      command: docker compose exec -T -u postgres pg-monitor pg_autoctl show state --pgdata /var/lib/postgres/pgaf
+      args:
+        chdir: "{{ pg_monitor_dir }}"
+
+- name: Deploy Postgres node2 (standby)
+  hosts: pg_node_vm2
+  gather_facts: false
+  roles:
+    - pg_node
+
+- name: Verify Postgres state after node2 join
+  hosts: pg_monitor
+  gather_facts: false
+  tasks:
+    - name: Show pg_auto_failover state
+      command: docker compose exec -T -u postgres pg-monitor pg_autoctl show state --pgdata /var/lib/postgres/pgaf
+      args:
+        chdir: "{{ pg_monitor_dir }}"
+
+- name: Deploy Postgres node3 (standby)
+  hosts: pg_node_vm3
+  gather_facts: false
+  roles:
+    - pg_node
+
+- name: Verify Postgres final state after node3 join
+  hosts: pg_monitor
+  gather_facts: false
+  tasks:
+    - name: Show pg_auto_failover state
+      command: docker compose exec -T -u postgres pg-monitor pg_autoctl show state --pgdata /var/lib/postgres/pgaf
+      args:
+        chdir: "{{ pg_monitor_dir }}"
+
+
+
+
+
+- name: Deploy Redis master + replicas, then Sentinel (combined compose, staged start)
+  hosts: redis_vms
+  gather_facts: false
+  roles:
+    - redis
+
+- name: Verify Sentinel quorum from VM1
+  hosts: redis_master
+  gather_facts: false
+  tasks:
+    - name: Show sentinels known to sentinel1
+      command: docker exec -t sentinel1 redis-cli -p 26379 SENTINEL sentinels mymaster
