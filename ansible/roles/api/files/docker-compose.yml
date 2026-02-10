@@ -1,0 +1,10 @@
+services:
+  api:
+    image: harbor.arcaptcha.ir/backend/goapi:4.38.1
+    container_name: goapi
+    restart: unless-stopped
+    volumes:
+      - ./default.env:/default.env:ro
+    ports:
+      - "80:80"
+      - "2112:2112"

@@ -16,8 +16,8 @@ mongo_replset: "rs0"
 
 # ---------- Target directories on VMs ----------
 pg_monitor_dir: "/home/s/db/monitor"
-pg_node_vm1_dir: "/home/s/db/node"
-pg_node_vm2_dir: "/home/s/db/node"
+pg_node_vm1_dir: "/home/s/db/node1"
+pg_node_vm2_dir: "/home/s/db/node2"
 pg_node_vm3_dir: "/home/s/db/node3"
 
 redis_dir: "/home/s/redis-ha"
