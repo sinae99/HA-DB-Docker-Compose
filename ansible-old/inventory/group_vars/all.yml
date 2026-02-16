@@ -1,0 +1,33 @@
+# ---------- Hosts / IPs ----------
+vm1_ip: "192.168.122.18"
+vm2_ip: "192.168.122.233"
+vm3_ip: "192.168.122.246"
+apivm_ip: "192.168.122.16"
+
+# ---------- Common ports ----------
+postgres_port: 5432
+pg_monitor_host_port: 5500
+
+redis_port: 6379
+redis_sentinel_port: 26379
+
+mongo_port: 27017
+mongo_replset: "rs0"
+
+# ---------- Target directories on VMs ----------
+pg_monitor_dir: "/home/s/db/monitor"
+pg_node_vm1_dir: "/home/s/db/node1"
+pg_node_vm2_dir: "/home/s/db/node2"
+pg_node_vm3_dir: "/home/s/db/node3"
+
+redis_dir: "/home/s/redis-ha"
+redis_sentinel_dir: "/home/s/redis-ha/sentinel-data"
+
+mongo_dir: "/home/s/mongo-rs"
+
+api_dir: "/home/s/goapi"
+
+# ---------- Monitor connection string used by nodes ----------
+# Monitor runs on VM3, exposed on host port 5500
+pg_monitor_dsn: "postgres://autoctl_node@192.168.122.246:5500/pg_auto_failover?sslmode=disable"
+

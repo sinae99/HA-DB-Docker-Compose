@@ -1,0 +1,58 @@
+---
+- name: Set Mongo node index from inventory
+  set_fact:
+    mongo_node_index: "{{ groups['mongo_members'].index(inventory_hostname) + 1 }}"
+
+- name: Ensure MongoDB directory exists
+  file:
+    path: "{{ mongo_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Deploy Mongo docker-compose from template
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ mongo_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Start MongoDB container
+  command: docker compose up -d
+  args:
+    chdir: "{{ mongo_dir }}"
+
+- name: Wait for mongod port to be reachable locally
+  wait_for:
+    host: "127.0.0.1"
+    port: "{{ mongo_port }}"
+    timeout: 60
+
+- name: Build replica set init eval from inventory
+  set_fact:
+    mongo_rs_init_eval: "rs.initiate({_id:\"{{ mongo_replset }}\",members:[{% for h in mongo_members_hostports %}{_id:{{ loop.index0 }},host:\"{{ h }}\"}{% if not loop.last %},{% endif %}{% endfor %}]})"
+  when: inventory_hostname == groups['mongo_members'] | first
+
+- name: Check whether replica set is already initialized (first member only)
+  command: docker exec mongo{{ mongo_node_index }} mongosh --quiet --eval 'rs.status().ok'
+  register: rs_ok
+  failed_when: false
+  changed_when: false
+  when: inventory_hostname == groups['mongo_members'] | first
+
+- name: Initialize replica set (first member only, first time)
+  command: >
+    docker exec mongo{{ mongo_node_index }} mongosh --quiet --eval '{{ mongo_rs_init_eval }}'
+  register: rs_init
+  when:
+    - inventory_hostname == groups['mongo_members'] | first
+    - mongo_rs_init_eval is defined
+  failed_when: false
+  changed_when: rs_init.rc == 0
+
+- name: Wait for replica set to become healthy (first member only)
+  command: docker exec mongo{{ mongo_node_index }} mongosh --quiet --eval 'rs.status().members.length'
+  register: rs_members_len
+  retries: 20
+  delay: 3
+  until: rs_members_len.rc == 0 and (rs_members_len.stdout | regex_search('[0-9]+')) | string == (mongo_members_hostports | length | string)
+  changed_when: false
+  when: inventory_hostname == groups['mongo_members'] | first

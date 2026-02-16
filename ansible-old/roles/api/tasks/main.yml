@@ -1,0 +1,23 @@
+---
+- name: Ensure API directory exists
+  file:
+    path: "{{ api_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Copy API env file
+  copy:
+    src: default.env
+    dest: "{{ api_dir }}/default.env"
+    mode: "0644"
+
+- name: Copy API docker-compose.yml
+  copy:
+    src: docker-compose.yml
+    dest: "{{ api_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Start goapi container
+  command: docker compose up -d
+  args:
+    chdir: "{{ api_dir }}"

@@ -1,0 +1,152 @@
+---
+# DB-only HA: Postgres (pg_auto_failover), Redis (+ Sentinel), MongoDB (replica set).
+# No API. Single entry: edit inventory/hosts.ini (3 IPs) then run this playbook.
+
+- name: Deploy Postgres monitor
+  hosts: pg_monitor
+  gather_facts: false
+  roles:
+    - pg_monitor
+
+- name: Deploy Postgres node1 (initial primary)
+  hosts: pg_node_vm1
+  gather_facts: false
+  roles:
+    - pg_node
+
+- name: Verify Postgres state after node1
+  hosts: pg_monitor
+  gather_facts: false
+  tasks:
+    - name: Show pg_auto_failover state
+      command: docker compose exec -T -u postgres pg-monitor pg_autoctl show state --pgdata /var/lib/postgres/pgaf
+      args:
+        chdir: "{{ pg_monitor_dir }}"
+
+- name: Deploy Postgres node2 (standby)
+  hosts: pg_node_vm2
+  gather_facts: false
+  roles:
+    - pg_node
+
+- name: Verify Postgres state after node2
+  hosts: pg_monitor
+  gather_facts: false
+  tasks:
+    - name: Show pg_auto_failover state
+      command: docker compose exec -T -u postgres pg-monitor pg_autoctl show state --pgdata /var/lib/postgres/pgaf
+      args:
+        chdir: "{{ pg_monitor_dir }}"
+
+- name: Deploy Postgres node3 (standby)
+  hosts: pg_node_vm3
+  gather_facts: false
+  roles:
+    - pg_node
+
+- name: Verify Postgres final state
+  hosts: pg_monitor
+  gather_facts: false
+  tasks:
+    - name: Show pg_auto_failover state
+      command: docker compose exec -T -u postgres pg-monitor pg_autoctl show state --pgdata /var/lib/postgres/pgaf
+      args:
+        chdir: "{{ pg_monitor_dir }}"
+
+- name: Deploy Redis (master + replicas + Sentinel)
+  hosts: redis_vms
+  gather_facts: false
+  roles:
+    - redis
+
+- name: Verify Sentinel quorum
+  hosts: redis_master
+  gather_facts: false
+  tasks:
+    - name: Set Redis node index
+      set_fact:
+        redis_node_index: "{{ groups['redis_vms'].index(inventory_hostname) + 1 }}"
+    - name: Show sentinels
+      command: docker exec sentinel{{ redis_node_index }} redis-cli -p 26379 SENTINEL sentinels mymaster
+
+- name: Deploy MongoDB and initialize replica set
+  hosts: mongo_members
+  gather_facts: false
+  roles:
+    - mongo
+
+- name: Verify Mongo replica set
+  hosts: "{{ groups['mongo_members'][0] }}"
+  gather_facts: false
+  tasks:
+    - name: Set Mongo node index
+      set_fact:
+        mongo_node_index: "{{ groups['mongo_members'].index(inventory_hostname) + 1 }}"
+    - name: Show rs members
+      command: docker exec mongo{{ mongo_node_index }} mongosh --quiet --eval 'rs.status().members.map(m => ({name:m.name, state:m.stateStr}))'
+
+- name: Create appdb_utf8 on current Postgres primary
+  hosts: pg_monitor
+  gather_facts: false
+  tasks:
+    - name: Get pg_auto_failover state
+      command: docker compose exec -T -u postgres pg-monitor pg_autoctl show state --pgdata /var/lib/postgres/pgaf
+      args:
+        chdir: "{{ pg_monitor_dir }}"
+      register: pg_state
+      changed_when: false
+
+    - name: Extract primary host:port
+      set_fact:
+        primary_hostport: >-
+          {{
+            (pg_state.stdout_lines
+              | select('search', ' primary ')
+              | list
+              | first
+              | split('|'))[2] | trim
+          }}
+
+    - name: Extract primary IP
+      set_fact:
+        primary_ip: "{{ primary_hostport.split(':')[0] }}"
+
+    - name: Fail if primary_ip empty
+      fail:
+        msg: "Could not detect primary_ip. primary_hostport='{{ primary_hostport }}'"
+      when: (primary_ip | trim) == ""
+
+    - name: Map primary to host and container
+      set_fact:
+        primary_host: "{{ pg_node_ip_to_host[primary_ip] }}"
+        primary_container: "pg-node{{ groups['pg_nodes'].index(pg_node_ip_to_host[primary_ip]) + 1 }}"
+
+    - name: Check if appdb_utf8 exists
+      command: >
+        docker exec -u postgres {{ primary_container }} psql -d postgres -tAc
+        "SELECT 1 FROM pg_database WHERE datname='appdb_utf8';"
+      delegate_to: "{{ primary_host }}"
+      register: db_exists
+      changed_when: false
+
+    - name: Create appdb_utf8 if missing
+      command: >
+        docker exec -u postgres {{ primary_container }} psql -d postgres -c
+        "CREATE DATABASE appdb_utf8 OWNER postgres TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C';"
+      delegate_to: "{{ primary_host }}"
+      when: (db_exists.stdout | trim) != "1"
+
+    - name: Enforce UTF-8 client encoding
+      command: >
+        docker exec -u postgres {{ primary_container }} psql -d postgres -c "{{ item }}"
+      delegate_to: "{{ primary_host }}"
+      loop:
+        - "ALTER DATABASE appdb_utf8 SET client_encoding TO 'UTF8';"
+        - "ALTER ROLE postgres SET client_encoding TO 'UTF8';"
+      changed_when: false
+
+- name: Final HA status report
+  hosts: all
+  gather_facts: false
+  roles:
+    - report

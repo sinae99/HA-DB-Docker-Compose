@@ -1,0 +1,31 @@
+# ---------------------------------------------------------------------------
+# All derived from inventory – no hardcoded IPs. Edit only inventory/hosts.ini.
+# ---------------------------------------------------------------------------
+
+pg_monitor_host: "{{ groups['pg_monitor'] | first }}"
+pg_monitor_ip: "{{ hostvars[pg_monitor_host]['ansible_host'] }}"
+pg_monitor_dsn: "postgres://autoctl_node@{{ pg_monitor_ip }}:{{ pg_monitor_host_port }}/pg_auto_failover?sslmode=disable"
+
+redis_master_host: "{{ groups['redis_master'] | first }}"
+redis_master_ip: "{{ hostvars[redis_master_host]['ansible_host'] }}"
+
+# Map node IP -> inventory host for primary detection; HBA entries for monitor
+pg_node_ip_to_host: "{{ dict(zip(groups['pg_nodes'] | map('extract', hostvars) | map(attribute='ansible_host') | list, groups['pg_nodes'])) }}"
+pg_monitor_hba_entries: "{{ groups['pg_nodes'] | map('extract', hostvars) | map(attribute='ansible_host') | map('regex_replace', '$', '/32') | list }}"
+
+mongo_members_hostports: "{{ groups['mongo_members'] | map('extract', hostvars) | map(attribute='ansible_host') | map('regex_replace', '$', ':' + mongo_port | string) | list }}"
+
+# Ports
+postgres_port: 5432
+pg_monitor_host_port: 5500
+redis_port: 6379
+redis_sentinel_port: 26379
+mongo_port: 27017
+mongo_replset: "rs0"
+
+# Target directories on the 3 VMs
+pg_monitor_dir: "/home/ubuntu/db/monitor"
+pg_node_dir_base: "/home/ubuntu/db"
+redis_dir: "/home/ubuntu/redis-ha"
+redis_sentinel_dir: "/home/ubuntu/redis-ha/sentinel-data"
+mongo_dir: "/home/ubuntu/mongo-rs"

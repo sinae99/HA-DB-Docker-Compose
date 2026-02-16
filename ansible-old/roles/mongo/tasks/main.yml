@@ -1,0 +1,50 @@
+---
+- name: Ensure MongoDB directory exists
+  file:
+    path: "{{ mongo_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Copy Mongo docker-compose.yml for this host
+  copy:
+    src: "vm{{ '1' if inventory_hostname == 'vm1' else '2' if inventory_hostname == 'vm2' else '3' }}/docker-compose.yml"
+    dest: "{{ mongo_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Start MongoDB container
+  command: docker compose up -d
+  args:
+    chdir: "{{ mongo_dir }}"
+
+- name: Wait for mongod port to be reachable locally
+  wait_for:
+    host: "127.0.0.1"
+    port: "{{ mongo_port }}"
+    timeout: 60
+
+# Only VM1 should initialize the replica set, and only if not already initiated
+- name: Check whether replica set is already initialized (VM1 only)
+  command: docker exec mongo1 mongosh --quiet --eval 'rs.status().ok'
+  register: rs_ok
+  failed_when: false
+  changed_when: false
+  when: inventory_hostname == "vm1"
+
+- name: Initialize replica set (VM1 only, first time)
+  command: >
+    docker exec mongo1 mongosh --quiet --eval
+    'rs.initiate({_id:"rs0",members:[{_id:0,host:"192.168.122.18:27017"},{_id:1,host:"192.168.122.233:27017"},{_id:2,host:"192.168.122.246:27017"}]})'
+  register: rs_init
+  when: inventory_hostname == "vm1"
+  failed_when: false
+  changed_when: rs_init.rc == 0
+
+
+- name: Wait for replica set to become healthy (VM1 only)
+  command: docker exec mongo1 mongosh --quiet --eval 'rs.status().members.length'
+  register: rs_members_len
+  retries: 20
+  delay: 3
+  until: rs_members_len.rc == 0 and (rs_members_len.stdout | regex_search('[0-9]+')) == "3"
+  changed_when: false
+  when: inventory_hostname == "vm1"

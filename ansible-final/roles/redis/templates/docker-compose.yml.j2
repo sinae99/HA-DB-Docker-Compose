@@ -1,0 +1,22 @@
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis{{ redis_node_index }}
+    network_mode: host
+    command: >
+      redis-server
+      --bind 0.0.0.0
+      --port 6379
+      --protected-mode no
+      --appendonly no
+      --save ""
+      {% if not redis_is_master %}--replicaof {{ redis_master_ip }} 6379{% endif %}
+
+  sentinel:
+    image: redis:7.2-alpine
+    container_name: sentinel{{ redis_node_index }}
+    network_mode: host
+    user: "0:0"
+    command: ["redis-server", "/data/sentinel.conf", "--sentinel"]
+    volumes:
+      - ./sentinel-data:/data

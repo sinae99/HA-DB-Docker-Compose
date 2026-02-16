@@ -1,0 +1,52 @@
+services:
+  pg-node:
+    image: citusdata/pg_auto_failover:latest
+    container_name: pg-node3
+    hostname: pg-node3
+    extra_hosts:
+      - "pg-node3:192.168.122.246"
+    restart: unless-stopped
+
+    # run as root to ensure the volume can be chowned; pg_autoctl runs as postgres via su
+    user: "0:0"
+
+    environment:
+      PGDATA: /var/lib/postgres/pgaf
+      PGSSLMODE: disable
+
+    # IMPORTANT: monitor already uses host port 5432 on VM3, so node uses 5433 on the host
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - node3_pgdata:/var/lib/postgres
+
+    command: >
+      bash -lc '
+        set -euo pipefail
+
+        mkdir -p /var/lib/postgres/pgaf
+        mkdir -p /var/lib/postgres/backup
+        chown -R postgres:postgres /var/lib/postgres
+        chmod 700 /var/lib/postgres/pgaf
+        chmod 700 /var/lib/postgres/backup
+
+        if [ ! -s /var/lib/postgres/pgaf/PG_VERSION ]; then
+          su - postgres -c "
+            pg_autoctl create postgres \
+              --pgdata /var/lib/postgres/pgaf \
+              --pgport 5432 \
+              --hostname 192.168.122.246 \
+              --monitor postgres://autoctl_node@192.168.122.246:5500/pg_auto_failover?sslmode=disable \
+              --auth trust \
+              --no-ssl
+          "
+        fi
+
+        exec su - postgres -c "pg_autoctl run --pgdata /var/lib/postgres/pgaf"
+      '
+
+volumes:
+  node3_pgdata:
+
+

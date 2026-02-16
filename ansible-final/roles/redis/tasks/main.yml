@@ -1,0 +1,70 @@
+---
+- name: Set Redis node index from inventory
+  set_fact:
+    redis_node_index: "{{ groups['redis_vms'].index(inventory_hostname) + 1 }}"
+
+- name: Set Redis master flag
+  set_fact:
+    redis_is_master: "{{ inventory_hostname in groups['redis_master'] }}"
+
+- name: Ensure Redis kernel setting (vm.overcommit_memory=1)
+  sysctl:
+    name: vm.overcommit_memory
+    value: "1"
+    state: present
+    reload: true
+
+- name: Ensure Redis base directory exists
+  file:
+    path: "{{ redis_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Ensure Sentinel data directory exists
+  file:
+    path: "{{ redis_sentinel_dir }}"
+    state: directory
+    mode: "0777"
+
+- name: Deploy sentinel.conf from template
+  template:
+    src: sentinel.conf.j2
+    dest: "{{ redis_sentinel_dir }}/sentinel.conf"
+    mode: "0666"
+
+- name: Deploy Redis+Sentinel docker-compose from template
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ redis_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Start Redis only (docker compose up -d redis)
+  command: docker compose up -d redis
+  args:
+    chdir: "{{ redis_dir }}"
+
+- name: Check Redis role (master/replica)
+  command: docker exec -t redis{{ redis_node_index }} redis-cli -p 6379 INFO replication
+  register: redis_info
+  changed_when: false
+
+- name: Show Redis replication info
+  debug:
+    var: redis_info.stdout_lines
+
+- name: Start Sentinel (docker compose up -d sentinel)
+  command: docker compose up -d sentinel
+  args:
+    chdir: "{{ redis_dir }}"
+
+- name: Check Sentinel master discovery (from each VM)
+  command: docker exec -t sentinel{{ redis_node_index }} redis-cli -p 26379 SENTINEL get-master-addr-by-name mymaster
+  register: sentinel_master
+  changed_when: false
+  retries: 10
+  delay: 2
+  until: sentinel_master.rc == 0
+
+- name: Show Sentinel master
+  debug:
+    var: sentinel_master.stdout_lines

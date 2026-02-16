@@ -1,0 +1,72 @@
+- name: Gather running containers
+  command: docker ps --format "{{ '{{' }}.Names{{ '}}' }}"
+  register: containers
+  failed_when: false
+  changed_when: false
+
+- set_fact:
+    has_pg: "{{ containers.stdout is search('pg-node') }}"
+    has_redis: "{{ containers.stdout is search('redis') }}"
+    has_sentinel: "{{ containers.stdout is search('sentinel') }}"
+    has_mongo: "{{ containers.stdout is search('mongo') }}"
+  changed_when: false
+
+- name: Detect Postgres role
+  command: >
+    docker exec -u postgres {{ containers.stdout_lines | select('search','pg-node') | list | first }}
+    psql -d postgres -tAc "select pg_is_in_recovery();"
+  register: pg_role
+  when: has_pg
+  failed_when: false
+  changed_when: false
+
+- name: Detect Redis role
+  command: docker exec {{ containers.stdout_lines | select('search','redis') | list | first }} redis-cli INFO replication
+  register: redis_info
+  when: has_redis
+  failed_when: false
+  changed_when: false
+
+- name: Detect Sentinel master
+  command: docker exec {{ containers.stdout_lines | select('search','sentinel') | list | first }} redis-cli -p 26379 SENTINEL get-master-addr-by-name mymaster
+  register: sentinel_master
+  when: has_sentinel
+  failed_when: false
+  changed_when: false
+
+- name: Detect Mongo role
+  command: docker exec {{ containers.stdout_lines | select('search','mongo') | list | first }} mongosh --quiet --eval "rs.isMaster().ismaster"
+  register: mongo_role
+  when: has_mongo
+  failed_when: false
+  changed_when: false
+
+- name: Print HA report (databases only)
+  debug:
+    msg: |
+      VM: {{ inventory_hostname }} ({{ ansible_host | default('') }})
+      --------------------------------
+      {% if has_pg %}
+      Postgres:
+        container: {{ containers.stdout_lines | select('search','pg-node') | list | first }}
+        role: {{ 'PRIMARY' if pg_role.stdout | trim == 'f' else 'STANDBY' }}
+        port: 5432
+      {% endif %}
+
+      {% if has_redis %}
+      Redis:
+        container: {{ containers.stdout_lines | select('search','redis') | list | first }}
+        role: {{ 'MASTER' if redis_info.stdout is search('role:master') else 'REPLICA' }}
+      {% endif %}
+
+      {% if has_sentinel %}
+      Sentinel:
+        container: {{ containers.stdout_lines | select('search','sentinel') | list | first }}
+        master: {{ sentinel_master.stdout | replace('\n','') }}
+      {% endif %}
+
+      {% if has_mongo %}
+      Mongo:
+        container: {{ containers.stdout_lines | select('search','mongo') | list | first }}
+        role: {{ 'PRIMARY' if mongo_role.stdout | trim == 'true' else 'SECONDARY' }}
+      {% endif %}

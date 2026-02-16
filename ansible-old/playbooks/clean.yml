@@ -1,0 +1,86 @@
+---
+- name: Nuke db-ha lab (containers + volumes + networks)
+  hosts: all
+  gather_facts: false
+  become: true
+  tags: [nuke, clean]
+  vars:
+    # Containers created by lab.yml (across all VMs)
+    lab_containers:
+      - pg-monitor
+      - pg-node1
+      - pg-node2
+      - pg-node3
+      - redis1
+      - redis2
+      - redis3
+      - sentinel1
+      - sentinel2
+      - sentinel3
+      - mongo1
+      - mongo2
+      - mongo3
+      - goapi
+
+    # Regex patterns for volumes created by docker compose (projectname_volumename)
+    # Examples you showed:
+    #   node2_node2_pgdata, node3_node3_pgdata, monitor_monitor_pgdata
+    lab_volume_regex: '^(node[123]_.*pgdata|monitor_.*pgdata|mongo[123]_data)$'
+
+    # Optional: remove only likely lab networks (compose creates <dir>_default like goapi_default)
+    lab_network_regex: '(^goapi_.*|_default$)'
+
+  tasks:
+    - name: Force remove known lab containers (ignore if missing)
+      command: docker rm -f {{ item }}
+      loop: "{{ lab_containers }}"
+      register: rm_known
+      failed_when: false
+      changed_when: rm_known.rc == 0
+
+    - name: Force remove any leftover containers matching lab name prefixes
+      shell: |
+        set -e
+        docker ps -a --format '{{"{{"}}.Names{{"}}"}}' \
+          | grep -E '^(pg-|redis|sentinel|mongo|goapi)' \
+          | xargs -r docker rm -f || true
+      failed_when: false
+      changed_when: false
+
+    - name: Remove lab volumes by pattern (compose-prefixed)
+      shell: |
+        set -e
+        docker volume ls -q \
+          | grep -E '{{ lab_volume_regex }}' \
+          | xargs -r docker volume rm || true
+      failed_when: false
+      changed_when: false
+
+    - name: Remove dangling volumes (safe)
+      shell: |
+        set -e
+        docker volume ls -qf dangling=true | xargs -r docker volume rm || true
+      failed_when: false
+      changed_when: false
+
+    - name: Remove lab networks (best-effort)
+      shell: |
+        set -e
+        docker network ls --format '{{"{{"}}.Name{{"}}"}}' \
+          | grep -E '{{ lab_network_regex }}' \
+          | xargs -r docker network rm || true
+      failed_when: false
+      changed_when: false
+
+    - name: Show remaining lab containers (should be empty)
+      shell: |
+        docker ps -a --format 'table {{"{{"}}.Names{{"}}"}}\t{{"{{"}}.Status{{"}}"}}\t{{"{{"}}.Ports{{"}}"}}' \
+          | egrep 'pg-|redis|sentinel|mongo|goapi' || true
+      register: remaining
+      changed_when: false
+      failed_when: false
+
+    - debug:
+        msg: |
+          Remaining lab containers on {{ inventory_hostname }}:
+          {{ remaining.stdout | default('(none)') }}

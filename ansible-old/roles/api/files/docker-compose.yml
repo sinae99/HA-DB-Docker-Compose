@@ -1,0 +1,32 @@
+services:
+  api:
+    image: harbor.arcaptcha.ir/backend/test/api-test:0.0.1
+    container_name: goapi
+    restart: unless-stopped
+    env_file:
+      - default.env
+      #   volumes:
+      #    - ./default.env:/default.env:ro
+    ports:
+      - "80:80"
+      - "2112:2112"
+
+    environment:
+      - DEV_MODE=0
+
+  # captchav4:
+  #   container_name: captchav4
+  #   image: harbor.arcaptcha.ir/backend/test/captcha-test:0.0.1
+  #   env_file:
+  #     - default.env
+  #   environment:
+  #     - REST_ADDR=:8008
+  #     - SHOW_LOG=1
+  #     - OBFUSCATION=0
+  #     - USE_S3=0
+  #     - EN_CACHE=1
+      
+
+  #   ports:
+  #     - "1324:8008"
+

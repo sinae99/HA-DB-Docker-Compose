@@ -1,0 +1,13 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: mongo{{ mongo_node_index }}
+    restart: unless-stopped
+    command: mongod --replSet {{ mongo_replset }} --bind_ip_all
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo{{ mongo_node_index }}_data:/data/db
+
+volumes:
+  mongo{{ mongo_node_index }}_data:

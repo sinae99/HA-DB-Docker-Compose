@@ -1,0 +1,48 @@
+services:
+  pg-node:
+    image: citusdata/pg_auto_failover:latest
+    container_name: {{ pg_node_container_name }}
+    hostname: {{ pg_node_container_name }}
+    extra_hosts:
+      - "{{ pg_node_container_name }}:{{ ansible_host }}"
+    restart: unless-stopped
+
+    user: "0:0"
+
+    environment:
+      PGDATA: /var/lib/postgres/pgaf
+      PGSSLMODE: disable
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - {{ pg_node_volume_name }}:/var/lib/postgres
+
+    command: >
+      bash -lc '
+        set -euo pipefail
+
+        mkdir -p /var/lib/postgres/pgaf
+        mkdir -p /var/lib/postgres/backup
+        chown -R postgres:postgres /var/lib/postgres
+        chmod 700 /var/lib/postgres/pgaf
+        chmod 700 /var/lib/postgres/backup
+
+        if [ ! -s /var/lib/postgres/pgaf/PG_VERSION ]; then
+          su - postgres -c "
+            pg_autoctl create postgres \
+              --pgdata /var/lib/postgres/pgaf \
+              --pgport 5432 \
+              --hostname {{ ansible_host }} \
+              --monitor {{ pg_monitor_dsn }} \
+              --auth trust \
+              --no-ssl
+          "
+        fi
+
+        exec su - postgres -c "pg_autoctl run --pgdata /var/lib/postgres/pgaf"
+      '
+
+volumes:
+  {{ pg_node_volume_name }}:

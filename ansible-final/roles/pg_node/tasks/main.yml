@@ -1,0 +1,41 @@
+---
+- name: Set Postgres node index from inventory
+  set_fact:
+    pg_node_index: "{{ groups['pg_nodes'].index(inventory_hostname) + 1 }}"
+
+- name: Set Postgres node facts from index
+  set_fact:
+    pg_node_dir: "{{ pg_node_dir_base }}/node{{ pg_node_index }}"
+    pg_node_container_name: "pg-node{{ pg_node_index }}"
+    pg_node_volume_name: "node{{ pg_node_index }}_pgdata"
+
+- name: Ensure Postgres node directory exists
+  file:
+    path: "{{ pg_node_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Deploy node docker-compose from template
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ pg_node_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Start Postgres node (docker compose up -d)
+  command: docker compose up -d
+  args:
+    chdir: "{{ pg_node_dir }}"
+
+- name: Wait for Postgres to accept TCP connections on this node
+  wait_for:
+    host: "127.0.0.1"
+    port: 5432
+    timeout: 120
+
+- name: Reload Postgres config on this node (wait until Postgres is ready)
+  command: docker exec -u postgres {{ pg_node_container_name }} psql -d postgres -c "select pg_reload_conf();"
+  register: reload_res
+  retries: 30
+  delay: 2
+  until: reload_res.rc == 0
+  changed_when: false

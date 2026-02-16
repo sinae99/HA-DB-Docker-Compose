@@ -1,0 +1,59 @@
+---
+- name: Ensure monitor directory exists
+  file:
+    path: "{{ pg_monitor_dir }}"
+    state: directory
+    mode: "0755"
+
+
+
+- name: Copy monitor docker-compose.yml
+  copy:
+    src: docker-compose.yml
+    dest: "{{ pg_monitor_dir }}/docker-compose.yml"
+    mode: "0644"
+
+
+
+- name: Start pg_auto_failover monitor (docker compose up -d)
+  command: docker compose up -d
+  args:
+    chdir: "{{ pg_monitor_dir }}"
+
+
+
+- name: Wait for monitor to accept connections
+  command: docker compose exec -T -u postgres pg-monitor psql -d pg_auto_failover -c "select 1;"
+  args:
+    chdir: "{{ pg_monitor_dir }}"
+  register: monitor_psql_check
+  retries: 20
+  delay: 3
+  until: monitor_psql_check.rc == 0
+
+
+
+- name: Allow Postgres nodes to connect to monitor (pg_hba.conf)
+  command: >
+    docker exec -u postgres pg-monitor bash -lc '
+      set -e
+      FILE=/var/lib/postgres/pgaf/pg_hba.conf
+
+      ensure_line() {
+        LINE="$1"
+        grep -Fqx "$LINE" "$FILE" || echo "$LINE" >> "$FILE"
+      }
+
+      ensure_line ""
+      ensure_line "host  pg_auto_failover  autoctl_node  192.168.122.18/32   trust"
+      ensure_line "host  pg_auto_failover  autoctl_node  192.168.122.233/32  trust"
+      ensure_line "host  pg_auto_failover  autoctl_node  192.168.122.246/32  trust"
+
+      tail -n 30 "$FILE"
+    '
+
+- name: Reload monitor Postgres config
+  command: >
+    docker compose exec -T -u postgres pg-monitor psql -d pg_auto_failover -c "select pg_reload_conf();"
+  args:
+    chdir: "{{ pg_monitor_dir }}"

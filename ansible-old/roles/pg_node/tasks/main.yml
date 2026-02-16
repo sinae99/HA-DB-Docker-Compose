@@ -1,0 +1,59 @@
+---
+- name: Decide Postgres node directory for this host
+  set_fact:
+    pg_node_dir: >-
+      {% if inventory_hostname == 'vm1' %}{{ pg_node_vm1_dir }}
+      {% elif inventory_hostname == 'vm2' %}{{ pg_node_vm2_dir }}
+      {% elif inventory_hostname == 'vm3' %}{{ pg_node_vm3_dir }}
+      {% else %}/home/s/db/node{% endif %}
+
+- name: Ensure Postgres node directory exists
+  file:
+    path: "{{ pg_node_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Copy node docker-compose.yml for this host
+  copy:
+    src: "vm{{ '1' if inventory_hostname == 'vm1' else '2' if inventory_hostname == 'vm2' else '3' }}/docker-compose.yml"
+    dest: "{{ pg_node_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Start Postgres node (docker compose up -d)
+  command: docker compose up -d
+  args:
+    chdir: "{{ pg_node_dir }}"
+
+
+- name: Set Postgres container name for this host
+  set_fact:
+    pg_container_name: >-
+      {% if inventory_hostname == 'vm1' %}pg-node1
+      {% elif inventory_hostname == 'vm2' %}pg-node2
+      {% elif inventory_hostname == 'vm3' %}pg-node3
+      {% else %}pg-node{% endif %}
+
+- name: Allow API VM in pg_hba.conf on this Postgres node
+  command: >
+    docker exec -u postgres {{ pg_container_name }} bash -lc '
+      set -e
+      FILE=/var/lib/postgres/pgaf/pg_hba.conf
+      LINE="host  all  postgres  192.168.122.16/32  trust"
+      grep -Fqx "$LINE" "$FILE" || (echo "" >> "$FILE" && echo "$LINE" >> "$FILE")
+    '
+
+
+
+- name: Wait for Postgres to accept TCP connections on this node
+  wait_for:
+    host: "127.0.0.1"
+    port: 5432
+    timeout: 120
+
+- name: Reload Postgres config on this node (wait until Postgres is ready)
+  command: docker exec -u postgres {{ pg_container_name }} psql -d postgres -c "select pg_reload_conf();"
+  register: reload_res
+  retries: 30
+  delay: 2
+  until: reload_res.rc == 0
+  changed_when: false
