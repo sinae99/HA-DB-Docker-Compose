@@ -9,8 +9,8 @@ pg_monitor_dsn: "postgres://autoctl_node@{{ pg_monitor_ip }}:{{ pg_monitor_host_
 redis_master_host: "{{ groups['redis_master'] | first }}"
 redis_master_ip: "{{ hostvars[redis_master_host]['ansible_host'] }}"
 
-# Map node IP -> inventory host for primary detection; HBA entries for monitor
-pg_node_ip_to_host: "{{ dict(zip(groups['pg_nodes'] | map('extract', hostvars) | map(attribute='ansible_host') | list, groups['pg_nodes'])) }}"
+# Map node IP -> inventory host for primary detection; HBA entries for monitor (no zip - loop builds dict)
+pg_node_ip_to_host: "{% set ns = namespace(d={}) %}{% for h in groups['pg_nodes'] %}{% set _ = ns.d.update({hostvars[h]['ansible_host']: h}) %}{% endfor %}{{ ns.d }}"
 pg_monitor_hba_entries: "{{ groups['pg_nodes'] | map('extract', hostvars) | map(attribute='ansible_host') | map('regex_replace', '$', '/32') | list }}"
 
 mongo_members_hostports: "{{ groups['mongo_members'] | map('extract', hostvars) | map(attribute='ansible_host') | map('regex_replace', '$', ':' + mongo_port | string) | list }}"

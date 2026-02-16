@@ -116,10 +116,13 @@
         msg: "Could not detect primary_ip. primary_hostport='{{ primary_hostport }}'"
       when: (primary_ip | trim) == ""
 
-    - name: Map primary to host and container
+    - name: Map primary IP to host and container (no group_vars zip)
       set_fact:
-        primary_host: "{{ pg_node_ip_to_host[primary_ip] }}"
-        primary_container: "pg-node{{ groups['pg_nodes'].index(pg_node_ip_to_host[primary_ip]) + 1 }}"
+        primary_host: "{{ item }}"
+        primary_container: "pg-node{{ groups['pg_nodes'].index(item) + 1 }}"
+      loop: "{{ groups['pg_nodes'] }}"
+      when: hostvars[item]['ansible_host'] == primary_ip
+      run_once: true
 
     - name: Check if appdb_utf8 exists
       command: >

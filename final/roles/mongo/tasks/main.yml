@@ -51,8 +51,21 @@
 - name: Wait for replica set to become healthy (first member only)
   command: docker exec mongo{{ mongo_node_index }} mongosh --quiet --eval 'rs.status().members.length'
   register: rs_members_len
-  retries: 20
-  delay: 3
-  until: rs_members_len.rc == 0 and (rs_members_len.stdout | regex_search('[0-9]+')) | string == (mongo_members_hostports | length | string)
+  retries: 40
+  delay: 5
+  until: >
+    rs_members_len.rc == 0 and
+    (rs_members_len.stdout | trim | default('0') | int) >= (mongo_members_hostports | length)
   changed_when: false
   when: inventory_hostname == groups['mongo_members'] | first
+  failed_when: false
+
+- name: Fail if replica set did not reach expected member count
+  fail:
+    msg: >
+      Replica set has {{ rs_members_len.stdout | trim | default('0') }} member(s), expected {{ mongo_members_hostports | length }}.
+      Check that vm1, vm2, vm3 can reach each other on port {{ mongo_port }} (e.g. firewall).
+      Expected member host:ports: {{ mongo_members_hostports }}
+  when:
+    - inventory_hostname == groups['mongo_members'] | first
+    - rs_members_len.rc != 0 or (rs_members_len.stdout | trim | default('0') | int) < (mongo_members_hostports | length)
